@@ -1,1 +1,101 @@
+# skript-utilities-lite
+# Copyright 2025 CobraGamer48
+# Licensed under the Apache License, Version 2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 
+options:
+    prefix: &8[&6ClearLag&8]&7
+    interval: 5 # minutes
+    warning_time: 30
+    bypass_radius: 10
+    bypass_permission: clearlag.bypass
+    
+    # worlds to clear
+    world_1: world
+    # add more: world_2, world_3, etc
+    
+    enable_warnings: true
+    
+    warning_sound: block.note_block.pling
+    countdown_sound: block.note_block.hat
+
+on load:
+    set {clearlag.next} to now
+    add {@interval} minutes to {clearlag.next}
+    send "ClearLag loaded - next cleanup in {@interval} minutes" to console
+
+every {@interval} minutes:
+    if {@enable_warnings} is true:
+        broadcast "{@prefix} Item cleanup in {@warning_time} seconds!"
+        play sound "{@warning_sound}" to all players at volume 1 with pitch 1
+        wait {@warning_time - 10} seconds
+        
+        broadcast "{@prefix} Item cleanup in 10 seconds!"
+        play sound "{@countdown_sound}" to all players at volume 1 with pitch 1
+        wait 1 second
+        
+        loop 9 times:
+            set {_time} to 10 - loop-number
+            if {_time} > 1:
+                broadcast "{@prefix} Item cleanup in %{_time}% seconds!"
+            else:
+                broadcast "{@prefix} Item cleanup in %{_time}% second!"
+            play sound "{@countdown_sound}" to all players at volume 1 with pitch 1.5
+            wait 1 second
+    else:
+        wait {@warning_time} seconds
+    
+    clearItems()
+
+command /clearlag [<text>]:
+    aliases: /cl, /lag
+    trigger:
+        if arg-1 is not set:
+            send "{@prefix} ClearLag v1.0.0"
+            send "{@prefix} Next cleanup: %difference between {clearlag.next} and now%"
+            send "{@prefix} /clearlag now - run cleanup"
+            send "{@prefix} /clearlag reload - reload config"
+            stop
+        
+        if arg-1 is "now":
+            if player has permission "clearlag.now":
+                broadcast "{@prefix} %player% is running cleanup now!"
+                clearItems()
+            else:
+                send "{@prefix} No permission."
+            stop
+        
+        if arg-1 is "reload":
+            if player has permission "clearlag.reload":
+                send "{@prefix} Config reloaded"
+                set {clearlag.next} to now
+                add {@interval} minutes to {clearlag.next}
+            else:
+                send "{@prefix} No permission."
+            stop
+        
+        send "{@prefix} Unknown command. Use /clearlag for help."
+
+function clearItems():
+    set {_count} to 0
+    set {_worlds::*} to {@world_1}
+    
+    loop all dropped items:
+        if world of loop-entity is in {_worlds::*}:
+            set {_skip} to false
+            
+            loop all players in world of loop-entity:
+                if loop-player-2 has permission "{@bypass_permission}":
+                    if distance between loop-entity and loop-player-2 < {@bypass_radius}:
+                        set {_skip} to true
+                        exit 1 loop
+            
+            if {_skip} is false:
+                add 1 to {_count}
+                delete loop-entity
+    
+    broadcast "{@prefix} Cleared %{_count}% items!"
+    play sound "{@warning_sound}" to all players at volume 1 with pitch 2
+    
+    set {clearlag.next} to now
+    add {@interval} minutes to {clearlag.next}
